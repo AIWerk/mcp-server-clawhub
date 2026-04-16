@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 2,
+  "id": "clawhub",
+  "name": "ClawHub",
+  "description": "ClawHub.ai skill catalog MCP server — search, browse, inspect, and download skills from the ClawHub registry. Works without a token (read-only); publish/delete/whoami unlock when CLAWHUB_TOKEN is set.",
+  "repository": "https://github.com/AIWerk/mcp-server-clawhub",
+  "transports": [
+    {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@aiwerk/mcp-server-clawhub"],
+      "env": {
+        "CLAWHUB_TOKEN": "${CLAWHUB_TOKEN}"
+      }
+    }
+  ],
+  "auth": {
+    "required": false,
+    "type": "api-key",
+    "envVars": ["CLAWHUB_TOKEN"],
+    "credentialsUrl": "https://clawhub.ai",
+    "instructions": "CLAWHUB_TOKEN is OPTIONAL. Without it the server starts in anonymous mode and exposes only read-only tools (search, list, get, scan, file, download). Set CLAWHUB_TOKEN to a Bearer token issued by clawhub.ai to unlock whoami, publish, delete, and undelete."
+  },
+  "install": {
+    "method": "npx",
+    "package": "@aiwerk/mcp-server-clawhub",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "homepage": "https://clawhub.ai",
+    "author": "AIWerk",
+    "license": "MIT",
+    "tags": [
+      "clawhub",
+      "skills",
+      "registry",
+      "catalog",
+      "discovery",
+      "publishing"
+    ],
+    "category": "development",
+    "subcategory": "registry",
+    "origin": "aiwerk",
+    "selfHosted": false,
+    "sideEffects": "read-write",
+    "pricing": "free",
+    "maturity": "beta",
+    "toolCount": 14,
+    "countries": ["global"],
+    "languages": ["en"],
+    "audience": "developer",
+    "firstPublished": "2026-04-16",
+    "lastVerified": "2026-04-16",
+    "verification": {
+      "tier1": "pass",
+      "tier2": "pass",
+      "tier2Reason": "anonymous-mode-testable",
+      "depAudit": "clean",
+      "depAuditDate": "2026-04-16"
+    }
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false,
+    "sampling": false
+  },
+  "skill": {
+    "apiVersion": "v1",
+    "apiVersionNote": "ClawHub.ai API v1 (https://clawhub.ai/api/v1). OpenAPI spec: https://clawhub.ai/api/v1/openapi.json",
+    "modes": [
+      {
+        "id": "anonymous",
+        "summary": "No CLAWHUB_TOKEN → only read-only tools are registered: clawhub_search, clawhub_list_skills, clawhub_get_skill, clawhub_list_versions, clawhub_get_version, clawhub_get_scan, clawhub_get_moderation, clawhub_get_file, clawhub_resolve, clawhub_download."
+      },
+      {
+        "id": "authenticated",
+        "summary": "CLAWHUB_TOKEN set → additional tools appear in tools/list: clawhub_whoami, clawhub_publish, clawhub_delete, clawhub_undelete. Rate limits also jump from 120/min/IP to 600/min/key (reads)."
+      }
+    ],
+    "gotchas": [
+      {
+        "id": "auth-tools-hidden-in-anon-mode",
+        "summary": "clawhub_whoami, clawhub_publish, clawhub_delete, clawhub_undelete are NOT registered when CLAWHUB_TOKEN is unset. If a user asks to publish and the tool is missing, the server is in anonymous mode — ask them to configure CLAWHUB_TOKEN.",
+        "tools": ["clawhub_publish", "clawhub_delete", "clawhub_undelete", "clawhub_whoami"]
+      },
+      {
+        "id": "delete-is-soft",
+        "summary": "clawhub_delete is a soft delete — the skill is marked hidden but not purged. It can be restored via clawhub_undelete. Still requires confirm=true to avoid accidents.",
+        "tools": ["clawhub_delete", "clawhub_undelete"]
+      },
+      {
+        "id": "version-vs-tag",
+        "summary": "Most read tools accept EITHER a version string OR a tag. If both are passed the server picks one (API-dependent). Prefer version when you have it; use tag (e.g. \"latest\") for convenience.",
+        "tools": ["clawhub_get_scan", "clawhub_get_file", "clawhub_download"]
+      },
+      {
+        "id": "download-is-base64",
+        "summary": "clawhub_download returns the zip as base64 (zipBase64 field) plus byte count. Decode client-side before writing to disk — do not assume a raw binary is returned.",
+        "tools": ["clawhub_download"]
+      },
+      {
+        "id": "publish-files-encoding",
+        "summary": "clawhub_publish.files[].content is UTF-8 text by default. For binary files set encoding=\"base64\" on the file entry. Mixing without the flag silently corrupts binaries.",
+        "tools": ["clawhub_publish"]
+      },
+      {
+        "id": "rate-limits-differ-by-auth",
+        "summary": "Anonymous: 120 reads/min per IP, 30 writes/min per IP. Authenticated: 600 reads/min per key, 120 writes/min per key. If a burst search hits 429 in anon mode, a token unlocks ~5× throughput.",
+        "tools": ["clawhub_search", "clawhub_list_skills"]
+      },
+      {
+        "id": "search-needs-q",
+        "summary": "clawhub_search requires a non-empty q parameter. For broad browsing without a query, use clawhub_list_skills with cursor pagination — but note the list endpoint applies a default server-side filter that may return an empty items[] for ungated browsing. Prefer clawhub_search for discovery.",
+        "tools": ["clawhub_search", "clawhub_list_skills"]
+      },
+      {
+        "id": "list-returns-items-array",
+        "summary": "clawhub_list_skills and clawhub_list_versions responses use an 'items' array (not 'skills' / 'versions') with 'nextCursor'. The OpenAPI schema names are different from the wire shape — iterate items[] and follow nextCursor.",
+        "tools": ["clawhub_list_skills", "clawhub_list_versions"]
+      },
+      {
+        "id": "moderation-404-is-ok",
+        "summary": "clawhub_get_moderation returns 404 for skills without moderation events. A 404 here means 'clean, no evidence collected' — not a missing skill. For the always-present moderation verdict, read the 'moderation' field embedded in clawhub_get_skill instead.",
+        "tools": ["clawhub_get_moderation", "clawhub_get_skill"]
+      },
+      {
+        "id": "nonsuspicious-filter",
+        "summary": "Both clawhub_search and clawhub_list_skills accept nonSuspiciousOnly=true to hide moderated/suspicious items. Default is false — moderation verdict is always available on each result for client-side filtering.",
+        "tools": ["clawhub_search", "clawhub_list_skills", "clawhub_get_moderation"]
+      }
+    ],
+    "workflows": [
+      {
+        "id": "discover-skill",
+        "name": "Find and inspect a skill the user mentioned by name",
+        "steps": [
+          "Call clawhub_search with q set to the keyword(s). Use limit=10 for a concise list.",
+          "From the top result, note the slug. Call clawhub_get_skill with that slug to pull full metadata, latestVersion, and owner info.",
+          "Optionally call clawhub_get_scan for the security verdict before recommending it to the user."
+        ]
+      },
+      {
+        "id": "read-skill-source",
+        "name": "Inspect a specific file inside a skill package",
+        "steps": [
+          "Call clawhub_get_skill to get the latest version identifier (or call clawhub_list_versions if the user wants a specific historical version).",
+          "Call clawhub_get_file with slug, path (e.g. \"README.md\" or \"SKILL.md\"), and the version.",
+          "Return the file content — it is raw text, not JSON-wrapped."
+        ]
+      },
+      {
+        "id": "version-resolve",
+        "name": "Check whether a local skill bundle is up to date",
+        "steps": [
+          "Compute the hash of the local bundle (ClawHub uses the same hash scheme as the one stored in SkillVersion.hash).",
+          "Call clawhub_resolve with slug and hash. The response has two fields: match (the version that matches the hash, or null) and latestVersion (the most recent version on ClawHub).",
+          "If match.version !== latestVersion.version, the local copy is stale — call clawhub_download to pull the newer zip."
+        ]
+      },
+      {
+        "id": "publish-new-version",
+        "name": "Publish a new version of an existing skill (authenticated only)",
+        "steps": [
+          "Confirm CLAWHUB_TOKEN is set by calling clawhub_whoami — if this tool is missing, the server is in anonymous mode and publishing is not possible.",
+          "Gather the files to upload. Text files use encoding=\"utf8\" (default), binary files must use encoding=\"base64\".",
+          "Call clawhub_publish with slug, displayName, version (bumped), changelog, tags, and files[].",
+          "Response includes skillId and versionId — surface both to the user for audit trail."
+        ]
+      },
+      {
+        "id": "soft-delete-and-restore",
+        "name": "Hide a skill without losing it (authenticated only)",
+        "steps": [
+          "Call clawhub_delete with slug and confirm=true. The skill becomes hidden from search and list endpoints but is retained server-side.",
+          "To reverse, call clawhub_undelete with the same slug. No confirm flag needed — the operation is itself the recovery action."
+        ]
+      }
+    ],
+    "bestPractices": [
+      "Default to anonymous mode for discovery — the read API is fully usable without a token and avoids leaking credentials into session logs.",
+      "Prefer clawhub_get_skill over parsing search results for full metadata — search returns compact rows, not the full skill object.",
+      "For bulk browsing, use clawhub_list_skills with cursor pagination (follow nextCursor) instead of incrementing limits. Cursor pagination is O(1) regardless of offset.",
+      "When presenting a skill to the user, always surface the moderation.verdict from clawhub_get_skill — a skill can be in the catalog but flagged suspicious.",
+      "Before calling clawhub_publish, test the file structure locally. Failed publishes do not automatically roll back partial uploads.",
+      "Wrap clawhub_delete in a visible user confirmation even though confirm=true is required — the soft-delete is reversible but still affects public visibility immediately."
+    ]
+  }
+}

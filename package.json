@@ -1,0 +1,48 @@
+{
+  "name": "@aiwerk/mcp-server-clawhub",
+  "version": "0.1.0",
+  "description": "ClawHub.ai skill catalog MCP server — search, browse, download skills; publish/delete when authenticated",
+  "type": "module",
+  "main": "dist/src/server.js",
+  "bin": {
+    "mcp-server-clawhub": "dist/src/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "clawhub",
+    "skills",
+    "catalog",
+    "registry"
+  ],
+  "author": "AIWerk <kontakt@aiwerk.ch>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AIWerk/mcp-server-clawhub.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.2.1"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
+}
