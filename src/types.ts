@@ -83,9 +83,12 @@ export interface ModerationResponse {
 }
 
 export interface WhoamiResponse {
-  handle?: string;
-  displayName?: string;
-  image?: string;
+  user: {
+    handle?: string;
+    displayName?: string;
+    image?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 

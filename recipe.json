@@ -128,6 +128,11 @@
         "id": "nonsuspicious-filter",
         "summary": "Both clawhub_search and clawhub_list_skills accept nonSuspiciousOnly=true to hide moderated/suspicious items. Default is false — moderation verdict is always available on each result for client-side filtering.",
         "tools": ["clawhub_search", "clawhub_list_skills", "clawhub_get_moderation"]
+      },
+      {
+        "id": "whoami-wraps-user",
+        "summary": "clawhub_whoami response wraps the user payload under a 'user' key — access response.user.handle, not response.handle directly. The OpenAPI spec lists fields at the top level, but the wire shape uses the wrapper.",
+        "tools": ["clawhub_whoami"]
       }
     ],
     "workflows": [
