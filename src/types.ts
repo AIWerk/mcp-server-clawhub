@@ -25,9 +25,11 @@ export interface SkillListItem {
   [key: string]: unknown;
 }
 
+// The live ClawHub API returns skill lists under `items` (not `skills` as the OpenAPI spec
+// suggests). We keep a passthrough index signature so non-declared fields still travel end-to-end.
 export interface SkillListResponse {
-  skills: SkillListItem[];
-  nextCursor?: string;
+  items: SkillListItem[];
+  nextCursor?: string | null;
   [key: string]: unknown;
 }
 
@@ -47,8 +49,8 @@ export interface SkillVersion {
 }
 
 export interface SkillVersionListResponse {
-  versions: SkillVersion[];
-  nextCursor?: string;
+  items: SkillVersion[];
+  nextCursor?: string | null;
   [key: string]: unknown;
 }
 
@@ -74,7 +76,9 @@ export interface ResolveResponse {
   [key: string]: unknown;
 }
 
-export interface ModerationResponse {
+// /skills/{slug}/moderation wraps the verdict payload under a `moderation` key.
+// The OpenAPI spec listed fields at the top level but the wire shape uses a wrapper.
+export interface ModerationVerdict {
   verdict?: string;
   reasonCodes?: string[];
   summary?: string;
@@ -82,13 +86,21 @@ export interface ModerationResponse {
   [key: string]: unknown;
 }
 
+export interface ModerationResponse {
+  moderation: ModerationVerdict;
+  [key: string]: unknown;
+}
+
+// /whoami wraps the user payload under a `user` key (verified against live API 2026-04-16).
+export interface WhoamiUser {
+  handle?: string;
+  displayName?: string;
+  image?: string;
+  [key: string]: unknown;
+}
+
 export interface WhoamiResponse {
-  user: {
-    handle?: string;
-    displayName?: string;
-    image?: string;
-    [key: string]: unknown;
-  };
+  user: WhoamiUser;
   [key: string]: unknown;
 }
 

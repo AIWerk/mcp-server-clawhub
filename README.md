@@ -43,16 +43,33 @@ Or in your MCP client config:
 
 | Tool | Description |
 |------|-------------|
-| `clawhub_search` | Search skills by query string |
-| `clawhub_list_skills` | List skills with cursor pagination |
+| `clawhub_search` | Search skills by query string — **primary discovery path** |
+| `clawhub_list_skills` | List skills with cursor pagination (see caveat below) |
 | `clawhub_get_skill` | Full details for a skill slug |
 | `clawhub_list_versions` | List all versions of a skill |
 | `clawhub_get_version` | Get a specific version (files + security snapshot) |
 | `clawhub_get_scan` | Security scan result for a version |
-| `clawhub_get_moderation` | Moderation verdict and evidence |
+| `clawhub_get_moderation` | Moderation verdict and evidence (response wraps under `moderation`) |
 | `clawhub_get_file` | Fetch a single raw file from a skill |
 | `clawhub_resolve` | Resolve version by content hash |
 | `clawhub_download` | Download skill zip (base64 encoded) |
+
+> **Discovery caveat:** the live `/skills` endpoint applies a default server-side filter that may
+> return an empty `items[]` for ungated browsing. In practice, **prefer `clawhub_search`** — it's the
+> reliable entry point for finding skills by keyword. Use `clawhub_list_skills` with cursor pagination
+> only when you have a specific filter in mind (e.g. highlighted/non-suspicious).
+
+### Wire shapes worth knowing
+
+Some live API responses differ from the published OpenAPI spec. The types in `src/types.ts` follow
+the **real wire shape**:
+
+- `clawhub_list_skills` → `{ items: [...], nextCursor }` (not `skills`)
+- `clawhub_list_versions` → `{ items: [...], nextCursor }` (not `versions`)
+- `clawhub_get_moderation` → `{ moderation: { verdict, ... } }` (wrapped)
+- `clawhub_whoami` → `{ user: { handle, ... } }` (wrapped)
+- `clawhub_get_moderation` returns **404** for skills with no moderation events — this means *clean*,
+  not *missing*. For the always-present verdict, read `.moderation` from `clawhub_get_skill`.
 
 ### Authenticated only (CLAWHUB_TOKEN required)
 

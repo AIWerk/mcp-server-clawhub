@@ -2,8 +2,15 @@
 // Base URL: https://clawhub.ai, API prefix: /api/v1
 // Auth: optional HTTP Bearer. Server operates in anonymous mode if CLAWHUB_TOKEN is unset.
 
+export type ClawHubErrorKind =
+  | 'http' // server returned a non-2xx status
+  | 'timeout' // AbortError from AbortSignal.timeout
+  | 'network' // DNS / connection reset / TLS / offline
+  | 'parse'; // server returned a 2xx with non-JSON body on a JSON endpoint
+
 export class ClawHubApiError extends Error {
   constructor(
+    public readonly kind: ClawHubErrorKind,
     public readonly status: number,
     public readonly statusText: string,
     message: string
@@ -14,6 +21,8 @@ export class ClawHubApiError extends Error {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+const RATE_LIMIT_STATUS = 429;
 
 export function getToken(): string | undefined {
   const t = process.env.CLAWHUB_TOKEN;
@@ -42,6 +51,7 @@ function buildHeaders(contentType?: string): Record<string, string> {
 function requireAuth(context: string): void {
   if (!hasAuth()) {
     throw new ClawHubApiError(
+      'http',
       401,
       'Unauthorized',
       `${context} requires authentication. Set CLAWHUB_TOKEN to enable this tool.`
@@ -58,7 +68,7 @@ async function handleJson<T>(response: Response, context: string): Promise<T> {
       const body = JSON.parse(text) as { error?: { message?: string }; message?: string };
       detail = body?.error?.message ?? body?.message ?? '';
     } catch {
-      // body not JSON
+      // body not JSON; fall through
     }
 
     let msg = `${context}: ${response.status} ${response.statusText}`;
@@ -66,28 +76,61 @@ async function handleJson<T>(response: Response, context: string): Promise<T> {
 
     if (response.status === 401) msg = `ClawHub API error: 401 Unauthorized - check CLAWHUB_TOKEN`;
     else if (response.status === 404) msg = `ClawHub API error: 404 Not Found - ${context.toLowerCase()}`;
-    else if (response.status === 429) msg = `ClawHub API error: 429 Too Many Requests - rate limit exceeded`;
+    else if (response.status === RATE_LIMIT_STATUS) msg = `ClawHub API error: 429 Too Many Requests - rate limit exceeded`;
+    else if (TRANSIENT_STATUSES.has(response.status)) msg = `ClawHub API error: ${response.status} ${response.statusText} - upstream transient failure`;
 
-    throw new ClawHubApiError(response.status, response.statusText, msg);
+    throw new ClawHubApiError('http', response.status, response.statusText, msg);
   }
 
   if (!text) return undefined as T;
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(`${context}: failed to parse response as JSON`);
+    throw new ClawHubApiError('parse', response.status, response.statusText, `${context}: response was not valid JSON`);
   }
 }
 
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  if (response.status === 429) {
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+function retryDelayMs(response: Response | null, attempt: number): number {
+  if (response) {
     const retryAfter = response.headers.get('Retry-After');
-    const delayMs = retryAfter ? Math.min(Number(retryAfter) * 1000, 60_000) : 2000;
-    await new Promise((r) => setTimeout(r, delayMs));
-    return fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    if (retryAfter) {
+      const parsed = Number(retryAfter);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Math.min(parsed * 1000, 60_000);
+      }
+    }
   }
-  return response;
+  // Fixed, bounded backoff — no exponential runaway.
+  return attempt === 1 ? 1_000 : 3_000;
+}
+
+async function rawFetch(url: string, init: RequestInit, context: string): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new ClawHubApiError('timeout', 0, 'Timeout', `${context}: request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new ClawHubApiError('network', 0, 'NetworkError', `${context}: network failure - ${msg}`);
+  }
+}
+
+// Single controlled retry for 429 + 5xx transient failures. Timeouts and network
+// errors are not retried (they often indicate real problems — surfacing them is
+// more useful than masking with a blind retry).
+async function fetchWithRetry(url: string, init: RequestInit, context: string): Promise<Response> {
+  const first = await rawFetch(url, init, context);
+  if (first.status !== RATE_LIMIT_STATUS && !TRANSIENT_STATUSES.has(first.status)) {
+    return first;
+  }
+  const delay = retryDelayMs(first, 1);
+  await new Promise((r) => setTimeout(r, delay));
+  return rawFetch(url, init, context);
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
@@ -109,27 +152,30 @@ export async function clawGet<T>(
   opts: { authRequired?: boolean } = {}
 ): Promise<T> {
   if (opts.authRequired) requireAuth(`GET ${path}`);
+  const context = `GET ${path}`;
   const response = await fetchWithRetry(buildUrl(path, params), {
     method: 'GET',
     headers: buildHeaders(),
-  });
-  return handleJson<T>(response, `GET ${path}`);
+  }, context);
+  return handleJson<T>(response, context);
 }
 
 export async function clawGetRaw(
   path: string,
   params?: Record<string, string | number | boolean | undefined>
 ): Promise<{ status: number; contentType: string; text: string }> {
+  const context = `GET ${path}`;
   const response = await fetchWithRetry(buildUrl(path, params), {
     method: 'GET',
     headers: buildHeaders(),
-  });
+  }, context);
   const text = await response.text();
   if (!response.ok) {
     throw new ClawHubApiError(
+      'http',
       response.status,
       response.statusText,
-      `GET ${path}: ${response.status} ${response.statusText}${text ? ` - ${text.slice(0, 200)}` : ''}`
+      `${context}: ${response.status} ${response.statusText}${text ? ` - ${text.slice(0, 200)}` : ''}`
     );
   }
   return {
@@ -143,16 +189,18 @@ export async function clawGetBinary(
   path: string,
   params?: Record<string, string | number | boolean | undefined>
 ): Promise<{ status: number; contentType: string; bytes: Uint8Array }> {
+  const context = `GET ${path}`;
   const response = await fetchWithRetry(buildUrl(path, params), {
     method: 'GET',
     headers: buildHeaders(),
-  });
+  }, context);
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
     throw new ClawHubApiError(
+      'http',
       response.status,
       response.statusText,
-      `GET ${path}: ${response.status} ${response.statusText}${errText ? ` - ${errText.slice(0, 200)}` : ''}`
+      `${context}: ${response.status} ${response.statusText}${errText ? ` - ${errText.slice(0, 200)}` : ''}`
     );
   }
   const buf = new Uint8Array(await response.arrayBuffer());
@@ -165,19 +213,21 @@ export async function clawGetBinary(
 
 export async function clawPost<T>(path: string, body: unknown, opts: { authRequired?: boolean } = { authRequired: true }): Promise<T> {
   if (opts.authRequired) requireAuth(`POST ${path}`);
+  const context = `POST ${path}`;
   const response = await fetchWithRetry(buildUrl(path), {
     method: 'POST',
     headers: buildHeaders('application/json'),
     body: JSON.stringify(body),
-  });
-  return handleJson<T>(response, `POST ${path}`);
+  }, context);
+  return handleJson<T>(response, context);
 }
 
 export async function clawDelete<T>(path: string, opts: { authRequired?: boolean } = { authRequired: true }): Promise<T> {
   if (opts.authRequired) requireAuth(`DELETE ${path}`);
+  const context = `DELETE ${path}`;
   const response = await fetchWithRetry(buildUrl(path), {
     method: 'DELETE',
     headers: buildHeaders(),
-  });
-  return handleJson<T>(response, `DELETE ${path}`);
+  }, context);
+  return handleJson<T>(response, context);
 }
