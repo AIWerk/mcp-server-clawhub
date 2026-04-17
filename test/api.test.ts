@@ -162,6 +162,31 @@ describe('error mapping', () => {
     const err = await clawGet('/search', { q: 'x' }).catch((e) => e);
     expect(err.kind).toBe('parse');
   });
+
+  test('4xx with plain-text body → detail surfaces in error message', async () => {
+    mockFetch(async () =>
+      new Response('invalid hash format: expected hex', {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'text/plain' },
+      })
+    );
+    const err = await clawGet('/resolve', { slug: 'x', hash: 'bad' }).catch((e) => e);
+    expect(err.kind).toBe('http');
+    expect(err.status).toBe(400);
+    expect(err.message).toMatch(/invalid hash format/);
+  });
+
+  test('4xx with JSON error.message body → structured detail wins over plain text', async () => {
+    mockFetch(async () =>
+      new Response(JSON.stringify({ error: { message: 'slug too long' } }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    const err = await clawGet('/resolve', { slug: 'x'.repeat(200), hash: 'a' }).catch((e) => e);
+    expect(err.message).toMatch(/slug too long/);
+  });
 });
 
 describe('response passthrough (wire shape)', () => {

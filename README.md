@@ -57,7 +57,8 @@ Or in your MCP client config:
 > **Discovery caveat:** the live `/skills` endpoint applies a default server-side filter that may
 > return an empty `items[]` for ungated browsing. In practice, **prefer `clawhub_search`** — it's the
 > reliable entry point for finding skills by keyword. Use `clawhub_list_skills` with cursor pagination
-> only when you have a specific filter in mind (e.g. highlighted/non-suspicious).
+> only when you have a specific filter in mind (e.g. `nonSuspiciousOnly=true`). The `highlightedOnly`
+> flag is available on `clawhub_search` but not on `clawhub_list_skills`.
 
 ### Wire shapes worth knowing
 

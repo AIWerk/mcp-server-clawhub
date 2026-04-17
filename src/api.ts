@@ -68,7 +68,10 @@ async function handleJson<T>(response: Response, context: string): Promise<T> {
       const body = JSON.parse(text) as { error?: { message?: string }; message?: string };
       detail = body?.error?.message ?? body?.message ?? '';
     } catch {
-      // body not JSON; fall through
+      // Body is not JSON — surface a trimmed plain-text excerpt so upstream 4xx/5xx
+      // detail (e.g. "invalid hash format") reaches operators instead of being silently dropped.
+      const trimmed = text.trim();
+      if (trimmed) detail = trimmed.slice(0, 200);
     }
 
     let msg = `${context}: ${response.status} ${response.statusText}`;
