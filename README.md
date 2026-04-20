@@ -17,6 +17,24 @@ The authenticated tools are simply not registered in anonymous mode — `tools/l
 
 ## Install
 
+Two ways to run this server — pick the one that fits.
+
+### Option 1 — Hosted (zero setup)
+
+No local runtime — if you set a token, it's AES-256-GCM encrypted server-side via HashiCorp Vault.
+
+1. Sign up at **[aiwerkmcp.com](https://aiwerkmcp.com)**.
+2. Install **ClawHub** from the catalog. Leave `CLAWHUB_TOKEN` empty for anonymous mode (10 read-only tools), or paste a token to unlock all 14.
+3. Point your MCP client (Claude.ai, Cursor, Hermes, …) at your hosted endpoint:
+   ```
+   https://bridge.aiwerk.ch/u/<your-user-id>/mcp
+   ```
+   with your Bearer token.
+
+### Option 2 — Self-hosted (npx)
+
+Run directly — you manage the token:
+
 ```bash
 npx -y @aiwerk/mcp-server-clawhub
 ```
@@ -100,6 +118,18 @@ npm install
 npm run build
 npm test
 ```
+
+## About AIWerk MCP
+
+Part of the **[AIWerk MCP platform](https://aiwerkmcp.com)** — curated, signed MCP recipes served either as npm packages for self-hosting or through our multi-tenant hosted bridge (`bridge.aiwerk.ch`).
+
+Other AIWerk MCP servers:
+
+- [@aiwerk/mcp-server-cal](https://github.com/AIWerk/mcp-server-cal) — Cal.com scheduling
+- [@aiwerk/mcp-server-imap](https://github.com/AIWerk/mcp-server-imap) — IMAP/SMTP email, provider-agnostic
+- [@aiwerk/mcp-server-wise](https://github.com/AIWerk/mcp-server-wise) — Wise (TransferWise) Personal API, read-only
+
+Browse the full catalog (20+ recipes including GitHub, Linear, Notion, Stripe, …) at [aiwerkmcp.com](https://aiwerkmcp.com).
 
 ## License
 
