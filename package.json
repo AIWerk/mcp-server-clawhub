@@ -1,7 +1,7 @@
 {
   "name": "@aiwerk/mcp-server-clawhub",
-  "version": "0.1.2",
-  "description": "ClawHub.ai skill catalog MCP server — search, browse, download skills; publish/delete when authenticated",
+  "version": "0.1.3",
+  "description": "ClawHub.ai skill catalog MCP server \u2014 search, browse, download skills; publish/delete when authenticated",
   "type": "module",
   "main": "dist/src/server.js",
   "bin": {
