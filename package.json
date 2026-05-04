@@ -12,7 +12,7 @@
     "start": "node dist/src/server.js",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "bash $HOME/agent-memory/commons/scripts/prepublish-safety.sh && npm run build && npm test"
   },
   "engines": {
     "node": ">=18.0.0"
