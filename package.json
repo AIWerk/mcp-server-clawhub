@@ -1,6 +1,7 @@
 {
   "name": "@aiwerk/mcp-server-clawhub",
-  "version": "0.1.3",
+  "mcpName": "io.github.AIWerk/mcp-server-clawhub",
+  "version": "0.1.4",
   "description": "ClawHub.ai skill catalog MCP server \u2014 search, browse, download skills; publish/delete when authenticated",
   "type": "module",
   "main": "dist/src/server.js",

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AIWerk/mcp-server-clawhub",
+  "description": "ClawHub.ai skill catalog: search, browse, inspect, and download skills (token unlocks publish).",
+  "version": "0.1.4",
+  "repository": {
+    "url": "https://github.com/AIWerk/mcp-server-clawhub",
+    "source": "github"
+  },
+  "websiteUrl": "https://aiwerkmcp.com/servers/clawhub/",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@aiwerk/mcp-server-clawhub",
+      "version": "0.1.4",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CLAWHUB_TOKEN",
+          "description": "ClawHub API token. Optional: read-only browsing works without it; required to publish or delete.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
